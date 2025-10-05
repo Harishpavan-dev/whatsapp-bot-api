@@ -9,10 +9,10 @@ const port = 3000;
 // ------------------------
 // ✅ MySQL pool
 const pool = mysql.createPool({
-    host: 'localhost',
-    user: 'root',
-    password: '', // your DB password
-    database: 'project_attendance_db',
+    host: 'sql112.infinityfree.com',
+    user: 'if0_38371120',
+    password: 'Hh2468024', // your DB password
+    database: 'if0_38371120_hndit_attendance_db',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
@@ -146,8 +146,3 @@ app.get('/notify_all', async (req, res) => {
 // ------------------------
 // Start API server
 app.listen(port, () => console.log(`🚀 Bot API running on port ${port}`));
-
-// ------------------------
-// Start API server
-app.listen(port, () => console.log(`Bot API running on port ${port}`));
-
