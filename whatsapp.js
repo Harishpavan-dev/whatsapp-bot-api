@@ -22,13 +22,16 @@ const pool = mysql.createPool({
 // ✅ WhatsApp client
 const client = new Client({
     authStrategy: new LocalAuth(),
-    puppeteer: { headless: false } // set true after first login
+    puppeteer: {
+        headless: true, // ✅ no window open
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+    }
 });
 
 // ------------------------
 // QR code login
 client.on('qr', qr => {
-    console.log('Scan this QR code with WhatsApp:');
+    console.log('📱 Scan this QR code with WhatsApp:');
     qrcode.generate(qr, { small: true });
 });
 
@@ -54,7 +57,7 @@ app.get('/notify', async (req, res) => {
 
         const record = rows[0];
 
-        if (record.notify_status === 'sent') return res.send('✅ Parent already notified');
+        if (record.notify_status === 'Sent') return res.send('✅ Parent already notified');
         if (!record.contact) return res.send('❌ No parent contact');
 
         const parent_number = record.contact + '@c.us';
@@ -63,9 +66,9 @@ app.get('/notify', async (req, res) => {
         try {
             await client.sendMessage(parent_number, messageText);
 
-            // ✅ Update DB to sent
+            // ✅ Update DB to Sent
             await pool.execute(
-                "UPDATE attende SET notify_status='sent' WHERE reg_no=? AND date=CURDATE()",
+                "UPDATE attende SET notify_status='Sent' WHERE reg_no=? AND date=CURDATE()",
                 [reg_no]
             );
 
@@ -73,13 +76,13 @@ app.get('/notify', async (req, res) => {
         } catch(err) {
             console.error('WhatsApp send error:', err);
 
-            // ✅ Update DB to failed
+            // ✅ Update DB to Failed
             await pool.execute(
-                "UPDATE attende SET notify_status='failed' WHERE reg_no=? AND date=CURDATE()",
+                "UPDATE attende SET notify_status='Failed' WHERE reg_no=? AND date=CURDATE()",
                 [reg_no]
             );
 
-            res.send('❌ Failed to send message, DB updated to failed');
+            res.send('❌ Failed to send message, DB updated to Failed');
         }
 
     } catch(err){
@@ -96,7 +99,7 @@ app.get('/notify_all', async (req, res) => {
             SELECT a.reg_no, a.status, a.notify_status, s.firstname, s.lastname, s.contact
             FROM attende a
             JOIN student s ON a.reg_no = s.reg_no
-            WHERE a.date = CURDATE() AND a.notify_status='pending'
+            WHERE a.date = CURDATE() AND a.notify_status='Pending'
         `);
 
         if(rows.length === 0) return res.send('No pending notifications');
@@ -107,7 +110,7 @@ app.get('/notify_all', async (req, res) => {
         for(const record of rows){
             if(!record.contact){
                 failCount++;
-                continue; // skip if no contact
+                continue;
             }
 
             const parent_number = record.contact + '@c.us';
@@ -116,24 +119,19 @@ app.get('/notify_all', async (req, res) => {
             try{
                 await client.sendMessage(parent_number, messageText);
 
-                // ✅ Update notify_status to sent
                 await pool.execute(
-                    "UPDATE attende SET notify_status='sent' WHERE reg_no=? AND date=CURDATE()",
+                    "UPDATE attende SET notify_status='Sent' WHERE reg_no=? AND date=CURDATE()",
                     [record.reg_no]
                 );
 
                 successCount++;
-
-                // Small delay to avoid WhatsApp blocking
-                await new Promise(resolve => setTimeout(resolve, 500)); // 0.5s
+                await new Promise(resolve => setTimeout(resolve, 500));
             }catch(err){
-                console.error(`Failed to send message to ${record.reg_no}`, err);
-
+                console.error(`Failed to send to ${record.reg_no}`, err);
                 await pool.execute(
-                    "UPDATE attende SET notify_status='failed' WHERE reg_no=? AND date=CURDATE()",
+                    "UPDATE attende SET notify_status='Failed' WHERE reg_no=? AND date=CURDATE()",
                     [record.reg_no]
                 );
-
                 failCount++;
             }
         }
@@ -147,4 +145,9 @@ app.get('/notify_all', async (req, res) => {
 
 // ------------------------
 // Start API server
+app.listen(port, () => console.log(`🚀 Bot API running on port ${port}`));
+
+// ------------------------
+// Start API server
 app.listen(port, () => console.log(`Bot API running on port ${port}`));
+
